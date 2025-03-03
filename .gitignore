@@ -1,3 +1,4 @@
 *.py
 *.out
 src/*.o
+csnakecompiler
