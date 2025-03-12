@@ -1,8 +1,10 @@
-// Calculate the sum of first n natural numbers
+// Calculate the sum of first n natural numbers (simplified)
 int sum_iterative(int n) {
     int result = 0;
-    for (int i = 1; i <= n; i++) {
-        result += i;
+    int i = 1;
+    while (i <= n) {
+        result = result + i;
+        i = i + 1;
     }
     return result;
 }
@@ -12,8 +14,8 @@ int sum_while(int n) {
     int result = 0;
     int i = 1;
     while (i <= n) {
-        result += i;
-        i++;
+        result = result + i;
+        i = i + 1;
     }
     return result;
 }
@@ -23,7 +25,7 @@ int main() {
     
     // Test for loop
     int for_result = sum_iterative(n);
-    printf("Sum of first %d numbers using for loop: %d\n", n, for_result);
+    printf("Sum of first %d numbers using iterative method: %d\n", n, for_result);
     
     // Test while loop
     int while_result = sum_while(n);
