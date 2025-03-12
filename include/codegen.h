@@ -3,6 +3,7 @@
 
 #include "parser.h"
 
-void generate_python_code(Variable *vars, int var_count, Token *tokens, int token_count);
+// Code generation functions
+void generate_python_code(Program *program, const char *output_file);
 
 #endif
