@@ -253,6 +253,13 @@ Expression *parse_unary(Parser *parser) {
         expr->unary.expr = parse_unary(parser); // Parse the operand
         return expr;
     }
+    if (match(parser, TOKEN_BIT_NOT)) {
+        Expression *expr = create_expression();
+        expr->type = EXPR_UNARY;
+        expr->unary.op = OP_BIT_NOT;
+        expr->unary.expr = parse_unary(parser);
+        return expr;
+    }
     
     Expression *expr = parse_primary(parser);
     
@@ -318,6 +325,20 @@ Expression *parse_term(Parser *parser) {
         binary->binary.right = parse_factor(parser);
         expr = binary;
     }
+    while (match(parser, TOKEN_SHIFT_LEFT) || match(parser, TOKEN_SHIFT_RIGHT)) {
+        Expression *binary = create_expression();
+        binary->type = EXPR_BINARY;
+        
+        if (previous(parser).type == TOKEN_SHIFT_LEFT) {
+            binary->binary.op = OP_SHIFT_LEFT;
+        } else {
+            binary->binary.op = OP_SHIFT_RIGHT;
+        }
+        
+        binary->binary.left = expr;
+        binary->binary.right = parse_factor(parser);
+        expr = binary;
+    }
     
     return expr;
 }
@@ -367,6 +388,15 @@ Expression *parse_equality(Parser *parser) {
         binary->binary.right = parse_comparison(parser);
         expr = binary;
     }
+
+    while (match(parser, TOKEN_BIT_AND)) {
+        Expression *binary = create_expression();
+        binary->type = EXPR_BINARY;
+        binary->binary.op = OP_BIT_AND;
+        binary->binary.left = expr;
+        binary->binary.right = parse_comparison(parser);
+        expr = binary;
+    }
     
     return expr;
 }
@@ -381,6 +411,36 @@ Expression *parse_and(Parser *parser) {
         binary->binary.op = OP_AND;
         binary->binary.left = expr;
         binary->binary.right = parse_equality(parser);
+        expr = binary;
+    }
+    
+    return expr;
+}
+
+Expression *parse_bitwise_or(Parser *parser) {
+    Expression *expr = parse_bitwise_xor(parser);
+    
+    while (match(parser, TOKEN_BIT_OR)) {
+        Expression *binary = create_expression();
+        binary->type = EXPR_BINARY;
+        binary->binary.op = OP_BIT_OR;
+        binary->binary.left = expr;
+        binary->binary.right = parse_bitwise_xor(parser);
+        expr = binary;
+    }
+    
+    return expr;
+}
+
+Expression *parse_bitwise_xor(Parser *parser) {
+    Expression *expr = parse_bitwise_and(parser);
+    
+    while (match(parser, TOKEN_BIT_XOR)) {
+        Expression *binary = create_expression();
+        binary->type = EXPR_BINARY;
+        binary->binary.op = OP_BIT_XOR;
+        binary->binary.left = expr;
+        binary->binary.right = parse_bitwise_and(parser);
         expr = binary;
     }
     

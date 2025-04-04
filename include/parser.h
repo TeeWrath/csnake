@@ -9,7 +9,8 @@ typedef struct Expression Expression;
 typedef struct Function Function;
 
 // Variable types
-typedef enum {
+typedef enum
+{
     TYPE_INT,
     TYPE_FLOAT,
     TYPE_CHAR,
@@ -18,10 +19,12 @@ typedef enum {
 } VariableType;
 
 // Variable structure
-typedef struct {
+typedef struct
+{
     char *name;
     VariableType type;
-    union {
+    union
+    {
         int int_val;
         float float_val;
         char char_val;
@@ -33,7 +36,8 @@ typedef struct {
 } Variable;
 
 // Expression types
-typedef enum {
+typedef enum
+{
     EXPR_VARIABLE,
     EXPR_LITERAL,
     EXPR_BINARY,
@@ -43,58 +47,89 @@ typedef enum {
 } ExpressionType;
 
 // Binary operation types
-typedef enum {
-    OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_MOD,
-    OP_EQ, OP_NEQ, OP_LT, OP_GT, OP_LTE, OP_GTE,
-    OP_AND, OP_OR, OP_ASSIGN
+typedef enum
+{
+    OP_ADD,
+    OP_SUB,
+    OP_MUL,
+    OP_DIV,
+    OP_MOD,
+    OP_EQ,
+    OP_NEQ,
+    OP_LT,
+    OP_GT,
+    OP_LTE,
+    OP_GTE,
+    OP_AND,
+    OP_OR,
+    OP_ASSIGN,
+    OP_BIT_AND,
+    OP_BIT_OR,
+    OP_BIT_XOR,
+    OP_SHIFT_LEFT,
+    OP_SHIFT_RIGHT,
 } BinaryOpType;
 
 // Unary operation types
-typedef enum {
-    OP_NEGATE, OP_NOT, OP_PRE_INC, OP_PRE_DEC,
-    OP_POST_INC, OP_POST_DEC
+typedef enum
+{
+    OP_NEGATE,
+    OP_NOT,
+    OP_PRE_INC,
+    OP_PRE_DEC,
+    OP_POST_INC,
+    OP_POST_DEC,
+    OP_BIT_NOT,
 } UnaryOpType;
 
 // Expression structure
-struct Expression {
+struct Expression
+{
     ExpressionType type;
-    union {
+    union
+    {
         // Variable
         char *var_name;
-        
+
         // Literal
-        struct {
+        struct
+        {
             VariableType lit_type;
-            union {
+            union
+            {
                 int int_val;
                 float float_val;
                 char char_val;
                 char *string_val;
             };
         } literal;
-        
+
         // Binary operation
-        struct {
+        struct
+        {
             BinaryOpType op;
             Expression *left;
             Expression *right;
         } binary;
-        
+
         // Unary operation
-        struct {
+        struct
+        {
             UnaryOpType op;
             Expression *expr;
         } unary;
-        
+
         // Function call
-        struct {
+        struct
+        {
             char *func_name;
             Expression **args;
             int arg_count;
         } call;
-        
+
         // Array access
-        struct {
+        struct
+        {
             char *array_name;
             Expression *index;
         } array_access;
@@ -102,7 +137,8 @@ struct Expression {
 };
 
 // Statement types
-typedef enum {
+typedef enum
+{
     STMT_EXPR,
     STMT_VAR_DECL,
     STMT_BLOCK,
@@ -116,50 +152,58 @@ typedef enum {
 } StatementType;
 
 // Statement structure
-struct Statement {
+struct Statement
+{
     StatementType type;
-    union {
+    union
+    {
         // Expression statement
         Expression *expr;
-        
+
         // Variable declaration
-        struct {
+        struct
+        {
             Variable var;
             Expression *initializer;
         } var_decl;
-        
+
         // Block statement
-        struct {
+        struct
+        {
             Statement **statements;
             int stmt_count;
         } block;
-        
+
         // If statement
-        struct {
+        struct
+        {
             Expression *condition;
             Statement *then_branch;
             Statement *else_branch;
         } if_stmt;
-        
+
         // While statement
-        struct {
+        struct
+        {
             Expression *condition;
             Statement *body;
         } while_stmt;
-        
+
         // For statement
-        struct {
+        struct
+        {
             Statement *initializer;
             Expression *condition;
             Expression *increment;
             Statement *body;
         } for_stmt;
-        
+
         // Return statement
         Expression *return_value;
-        
+
         // Print statement
-        struct {
+        struct
+        {
             char *format;
             Expression **args;
             int arg_count;
@@ -168,7 +212,8 @@ struct Statement {
 };
 
 // Function structure
-struct Function {
+struct Function
+{
     char *name;
     VariableType return_type;
     Variable *params;
@@ -177,7 +222,8 @@ struct Function {
 };
 
 // Program structure
-typedef struct {
+typedef struct
+{
     Function **functions;
     int function_count;
     Variable *global_vars;

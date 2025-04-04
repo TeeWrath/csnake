@@ -1,4 +1,7 @@
-*.py
+output.py
+array.py
+fact.py
+loop.py
 *.out
 src/*.o
-csnakecompiler
+# csnakecompiler
