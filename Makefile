@@ -42,4 +42,21 @@ test_factorial.c:
 	@echo "    return 0;" >> test_factorial.c
 	@echo "}" >> test_factorial.c
 
+bitwise_test: $(TARGET)
+	@echo "Testing bitwise operations..."
+	@echo "// Bitwise test" > bitwise_test.c
+	@echo "int main() {" >> bitwise_test.c
+	@echo "    unsigned int flags = 0;" >> bitwise_test.c
+	@echo "    flags |= 0x1;" >> bitwise_test.c
+	@echo "    flags ^= 0x6;" >> bitwise_test.c
+	@echo "    int shifted = flags << 2;" >> bitwise_test.c
+	@echo "    int masked = flags & 0xFF;" >> bitwise_test.c
+	@echo "    return 0;" >> bitwise_test.c
+	@echo "}" >> bitwise_test.c
+	./$(TARGET) bitwise_test.c -o bitwise_test.py
+	@echo "\nGenerated Python code:"
+	@cat bitwise_test.py
+	@echo "\nRunning Python code:"
+	python3 bitwise_test.py
+
 .PHONY: all clean test
