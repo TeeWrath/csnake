@@ -1,0 +1,6 @@
+Sum of first 10 numbers using iterative method: 55
+
+Sum of first 10 numbers using while loop: 55
+
+Both methods give the same result!
+
