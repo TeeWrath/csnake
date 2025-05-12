@@ -17,7 +17,19 @@ void print_indent(FILE *fp, int indent)
     }
 }
 
-// Helper function to generate variable type
+// Helper function to get Python type name for type hints
+const char *get_python_type_name(VariableType type) {
+    switch (type) {
+        case TYPE_INT: return "int";
+        case TYPE_FLOAT: return "float";
+        case TYPE_CHAR: return "str";
+        case TYPE_STRING: return "str";
+        case TYPE_VOID: return "None";
+        default: return "Any";
+    }
+}
+
+// Helper function to generate variable type (for initialization)
 const char *get_type_name(VariableType type)
 {
     switch (type)
@@ -41,11 +53,11 @@ const char *get_type_name(VariableType type)
 void generate_variable_declaration(FILE *fp, Variable *var, Expression *initializer, int indent)
 {
     print_indent(fp, indent);
-    fprintf(fp, "%s = ", var->name);
+    fprintf(fp, "%s: %s = ", var->name, get_python_type_name(var->type));
 
     if (initializer != NULL)
     {
-        generate_expression(fp, initializer, 0);
+        generate_expression(fp, initializer, indent);
     }
     else
     {
@@ -295,6 +307,9 @@ void generate_function_call(FILE *fp, Expression *expr)
 // Generate an expression
 void generate_expression(FILE *fp, Expression *expr, int indent)
 {
+    // Suppress unused parameter warning
+    (void)indent;
+
     if (expr == NULL)
         return;
 
@@ -418,6 +433,9 @@ void generate_return_statement(FILE *fp, Statement *stmt, int indent)
 // Generate a break statement
 void generate_break_statement(FILE *fp, Statement *stmt, int indent)
 {
+    // Suppress unused parameter warning
+    (void)stmt;
+
     print_indent(fp, indent);
     fprintf(fp, "break\n");
 }
@@ -425,6 +443,9 @@ void generate_break_statement(FILE *fp, Statement *stmt, int indent)
 // Generate a continue statement
 void generate_continue_statement(FILE *fp, Statement *stmt, int indent)
 {
+    // Suppress unused parameter warning
+    (void)stmt;
+
     print_indent(fp, indent);
     fprintf(fp, "continue\n");
 }
@@ -440,7 +461,6 @@ void generate_print_statement(FILE *fp, Statement *stmt, int indent)
         strcmp(stmt->print.format, "%c") == 0 ||
         strcmp(stmt->print.format, "%s") == 0)
     {
-
         if (stmt->print.arg_count == 1)
         {
             fprintf(fp, "print(");
@@ -577,108 +597,55 @@ void generate_statement(FILE *fp, Statement *stmt, int indent)
     }
 }
 
-// Generate a function
-void generate_function(FILE *fp, Function *func)
-{
-    fprintf(fp, "def %s(", func->name);
-
-    // Generate parameters
-    for (int i = 0; i < func->param_count; i++)
-    {
-        if (i > 0)
-        {
-            fprintf(fp, ", ");
-        }
-        fprintf(fp, "%s", func->params[i].name);
-    }
-
-    fprintf(fp, "):\n");
-
-    // Generate function body
-    if (func->body != NULL)
-    {
-        generate_block(fp, func->body, 1);
-    }
-    else
-    {
-        // Empty function body
-        fprintf(fp, "    pass\n");
-    }
-
-    // Add a newline after each function
-    fprintf(fp, "\n");
-}
-
-// Generate Python code from the parsed C program
+// Generate Python code from the program
 void generate_python_code(Program *program, const char *output_file)
 {
     FILE *fp = fopen(output_file, "w");
     if (!fp)
     {
-        fprintf(stderr, "Error opening output file '%s'\n", output_file);
+        fprintf(stderr, "Error: Could not open output file %s\n", output_file);
         return;
     }
 
-    // Add a header comment
-    fprintf(fp, "# Generated Python code from C source\n");
-    fprintf(fp, "# This file was automatically translated by Csnake\n\n");
-    // In generate_python_code(), at the beginning:
-    fprintf(fp, "# Bitwise operation support\n");
-    fprintf(fp, "from bitwise_helpers import *\n\n");
+    // Add necessary imports
+    fprintf(fp, "from dataclasses import dataclass, field\n");
+    fprintf(fp, "from typing import List\n\n");
+
+    // Generate structs
+    generate_structs(fp, program->structs, program->struct_count);
 
     // Generate global variables
-    if (program->global_var_count > 0)
+    fprintf(fp, "# Global variables\n");
+    for (int i = 0; i < program->global_var_count; i++)
     {
-        fprintf(fp, "# Global variables\n");
-        for (int i = 0; i < program->global_var_count; i++)
-        {
-            char *default_value = "None";
-            if (program->global_vars[i].type == TYPE_INT)
-            {
-                default_value = "0";
-            }
-            else if (program->global_vars[i].type == TYPE_FLOAT)
-            {
-                default_value = "0.0";
-            }
-            else if (program->global_vars[i].type == TYPE_CHAR)
-            {
-                default_value = "''";
-            }
+        generate_variable_declaration(fp, &program->global_vars[i], NULL, 0);
+    }
+    fprintf(fp, "\n");
 
-            if (program->global_vars[i].is_array)
-            {
-                fprintf(fp, "%s = [%s] * %d\n",
-                        program->global_vars[i].name,
-                        default_value,
-                        program->global_vars[i].array_size);
-            }
-            else
-            {
-                fprintf(fp, "%s = %s\n", program->global_vars[i].name, default_value);
-            }
+    // Generate functions
+    fprintf(fp, "# Functions\n");
+    for (int i = 0; i < program->function_count; i++)
+    {
+        Function *func = program->functions[i];
+        fprintf(fp, "def %s(", func->name);
+
+        // Generate parameters with type hints
+        for (int j = 0; j < func->param_count; j++)
+        {
+            if (j > 0)
+                fprintf(fp, ", ");
+            fprintf(fp, "%s: %s", func->params[j].name, get_python_type_name(func->params[j].type));
         }
+        fprintf(fp, ") -> %s:\n", get_python_type_name(func->return_type));
+
+        // Generate function body
+        generate_statement(fp, func->body, 1);
         fprintf(fp, "\n");
     }
 
-    // Generate functions
-    for (int i = 0; i < program->function_count; i++)
-    {
-        generate_function(fp, program->functions[i]);
-    }
-
-    // Add a main function call at the end if main exists
-    for (int i = 0; i < program->function_count; i++)
-    {
-        if (strcmp(program->functions[i]->name, "main") == 0)
-        {
-            fprintf(fp, "# Call main function if this script is run directly\n");
-            fprintf(fp, "if __name__ == \"__main__\":\n");
-            fprintf(fp, "    main()\n");
-            break;
-        }
-    }
+    // Add main execution
+    fprintf(fp, "if __name__ == \"__main__\":\n");
+    fprintf(fp, "    main()\n");
 
     fclose(fp);
-    printf("Python code generated in '%s'\n", output_file);
 }

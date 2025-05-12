@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Iinclude -Wall -Wextra -g
-SRC = src/main.c src/lexer.c src/parser.c src/codegen.c
+SRC = src/main.c src/lexer.c src/parser.c src/codegen.c src/struct_codegen.c
 OBJ = $(SRC:.c=.o)
 TARGET = csnakecompiler
 
@@ -24,6 +24,16 @@ test: $(TARGET)
 	@cat output.py
 	@echo "\nRunning Python code:"
 	python3 output.py
+
+# Test target for structs and static typing
+struct_test: $(TARGET)
+	@echo "Testing with struct and static typing program..."
+	@cat test_struct.c
+	./$(TARGET) test_struct.c -o struct_test.py
+	@echo "\nGenerated Python code:"
+	@cat struct_test.py
+	@echo "\nRunning Python code:"
+	python3 struct_test.py
 
 # Create a sample test file if it doesn't exist
 test_factorial.c:
@@ -59,4 +69,4 @@ bitwise_test: $(TARGET)
 	@echo "\nRunning Python code:"
 	python3 bitwise_test.py
 
-.PHONY: all clean test
+.PHONY: all clean test struct_test

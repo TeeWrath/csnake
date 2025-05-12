@@ -38,6 +38,18 @@ Function *create_function() {
     return func;
 }
 
+Struct *create_struct() {  // Added for struct support
+    Struct *s = malloc(sizeof(Struct));
+    if (!s) {
+        fprintf(stderr, "Memory allocation failed\n");
+        exit(1);
+    }
+    s->name = NULL;
+    s->fields = NULL;
+    s->field_count = 0;
+    return s;
+}
+
 // Parser state
 typedef struct {
     Token *tokens;
@@ -51,6 +63,10 @@ Expression *parse_expression(Parser *parser);
 Statement *parse_statement(Parser *parser);
 Statement *parse_block(Parser *parser);
 Function *parse_function(Parser *parser);
+Struct *parse_struct(Parser *parser);  // Added for struct support
+Expression *parse_bitwise_and(Parser *parser);  // Added forward declaration
+Expression *parse_bitwise_xor(Parser *parser);  // Added forward declaration
+Expression *parse_bitwise_or(Parser *parser);   // Added forward declaration
 void advance(Parser *parser);
 Token peek(Parser *parser);
 Token previous(Parser *parser);
@@ -138,6 +154,7 @@ void synchronize(Parser *parser) {
             case TOKEN_WHILE:
             case TOKEN_FOR:
             case TOKEN_RETURN:
+            case TOKEN_STRUCT:  // Added for struct support
                 return;
             default:
                 break;
@@ -388,27 +405,17 @@ Expression *parse_equality(Parser *parser) {
         binary->binary.right = parse_comparison(parser);
         expr = binary;
     }
+    return expr;
+}
 
+// Parse bitwise AND expressions (&)
+Expression *parse_bitwise_and(Parser *parser) {
+    Expression *expr = parse_equality(parser);
+    
     while (match(parser, TOKEN_BIT_AND)) {
         Expression *binary = create_expression();
         binary->type = EXPR_BINARY;
         binary->binary.op = OP_BIT_AND;
-        binary->binary.left = expr;
-        binary->binary.right = parse_comparison(parser);
-        expr = binary;
-    }
-    
-    return expr;
-}
-
-// Parse logical AND expressions (&&)
-Expression *parse_and(Parser *parser) {
-    Expression *expr = parse_equality(parser);
-    
-    while (match(parser, TOKEN_AND)) {
-        Expression *binary = create_expression();
-        binary->type = EXPR_BINARY;
-        binary->binary.op = OP_AND;
         binary->binary.left = expr;
         binary->binary.right = parse_equality(parser);
         expr = binary;
@@ -417,6 +424,23 @@ Expression *parse_and(Parser *parser) {
     return expr;
 }
 
+// Parse bitwise XOR expressions (^)
+Expression *parse_bitwise_xor(Parser *parser) {
+    Expression *expr = parse_bitwise_and(parser);
+    
+    while (match(parser, TOKEN_BIT_XOR)) {
+        Expression *binary = create_expression();
+        binary->type = EXPR_BINARY;
+        binary->binary.op = OP_BIT_XOR;
+        binary->binary.left = expr;
+        binary->binary.right = parse_bitwise_and(parser);
+        expr = binary;
+    }
+    
+    return expr;
+}
+
+// Parse bitwise OR expressions (|)
 Expression *parse_bitwise_or(Parser *parser) {
     Expression *expr = parse_bitwise_xor(parser);
     
@@ -432,15 +456,16 @@ Expression *parse_bitwise_or(Parser *parser) {
     return expr;
 }
 
-Expression *parse_bitwise_xor(Parser *parser) {
-    Expression *expr = parse_bitwise_and(parser);
+// Parse logical AND expressions (&&)
+Expression *parse_and(Parser *parser) {
+    Expression *expr = parse_bitwise_or(parser);
     
-    while (match(parser, TOKEN_BIT_XOR)) {
+    while (match(parser, TOKEN_AND)) {
         Expression *binary = create_expression();
         binary->type = EXPR_BINARY;
-        binary->binary.op = OP_BIT_XOR;
+        binary->binary.op = OP_AND;
         binary->binary.left = expr;
-        binary->binary.right = parse_bitwise_and(parser);
+        binary->binary.right = parse_bitwise_or(parser);
         expr = binary;
     }
     
@@ -709,6 +734,65 @@ Statement *parse_continue_statement(Parser *parser) {
     return stmt;
 }
 
+// Parse struct definition
+Struct *parse_struct(Parser *parser) {
+    Struct *s = create_struct();
+    
+    // Parse struct name
+    consume(parser, TOKEN_ID, "Expected struct name");
+    s->name = strdup(previous(parser).value);
+    
+    // Parse fields
+    consume(parser, TOKEN_LBRACE, "Expected '{' after struct name");
+    
+    s->fields = malloc(10 * sizeof(Variable));
+    s->field_count = 0;
+    int capacity = 10;
+    
+    while (!check(parser, TOKEN_RBRACE) && !is_at_end(parser)) {
+        if (s->field_count >= capacity) {
+            capacity *= 2;
+            s->fields = realloc(s->fields, capacity * sizeof(Variable));
+        }
+        
+        // Parse field type
+        if (match(parser, TOKEN_INT) || match(parser, TOKEN_FLOAT) || match(parser, TOKEN_CHAR)) {
+            s->fields[s->field_count].type = token_to_var_type(previous(parser).type);
+        } else {
+            fprintf(stderr, "Parse error at line %d, column %d: Expected field type\n", 
+                    peek(parser).line, peek(parser).column);
+            s->fields[s->field_count].type = TYPE_INT;
+        }
+        
+        // Parse field name
+        consume(parser, TOKEN_ID, "Expected field name");
+        s->fields[s->field_count].name = strdup(previous(parser).value);
+        s->fields[s->field_count].is_array = 0;
+        s->fields[s->field_count].is_initialized = 0;
+        
+        // Check for array field
+        if (match(parser, TOKEN_LBRACKET)) {
+            s->fields[s->field_count].is_array = 1;
+            if (match(parser, TOKEN_NUMBER)) {
+                s->fields[s->field_count].array_size = atoi(previous(parser).value);
+            } else {
+                fprintf(stderr, "Parse error at line %d, column %d: Expected array size\n", 
+                        peek(parser).line, peek(parser).column);
+                s->fields[s->field_count].array_size = 0;
+            }
+            consume(parser, TOKEN_RBRACKET, "Expected ']' after array size");
+        }
+        
+        consume(parser, TOKEN_SEMICOLON, "Expected ';' after field declaration");
+        s->field_count++;
+    }
+    
+    consume(parser, TOKEN_RBRACE, "Expected '}' at end of struct");
+    consume(parser, TOKEN_SEMICOLON, "Expected ';' after struct definition");
+    
+    return s;
+}
+
 // The main statement parsing function
 Statement *parse_statement(Parser *parser) {
     if (match(parser, TOKEN_IF)) {
@@ -750,7 +834,6 @@ Statement *parse_statement(Parser *parser) {
         
         // Check if it's a function declaration
         if (check(parser, TOKEN_ID)) {
-            Token id_token = peek(parser);
             advance(parser);
             
             if (check(parser, TOKEN_LPAREN)) {
@@ -845,11 +928,26 @@ Program *parse(Token *tokens, int token_count) {
     program->function_count = 0;
     program->global_vars = malloc(10 * sizeof(Variable));
     program->global_var_count = 0;
+    program->structs = malloc(10 * sizeof(Struct));  // Added for struct support
+    program->struct_count = 0;
     
     int func_capacity = 10;
     int var_capacity = 10;
+    int struct_capacity = 10;
     
     while (!is_at_end(&parser)) {
+        // Try to parse a struct
+        if (match(&parser, TOKEN_STRUCT)) {
+            Struct *s = parse_struct(&parser);
+            if (program->struct_count >= struct_capacity) {
+                struct_capacity *= 2;
+                program->structs = realloc(program->structs, struct_capacity * sizeof(Struct));
+            }
+            program->structs[program->struct_count++] = *s;
+            free(s); // Copy struct into program, free temporary
+            continue;
+        }
+        
         // Try to parse a function
         Function *func = parse_function(&parser);
         
@@ -871,7 +969,7 @@ Program *parse(Token *tokens, int token_count) {
                 program->global_vars[program->global_var_count++] = stmt->var_decl.var;
                 free(stmt); // We've extracted the variable, free the statement
             } else if (stmt != NULL) {
-                fprintf(stderr, "Error: Only function declarations and global variables are allowed at the top level\n");
+                fprintf(stderr, "Error: Only function declarations, global variables, and structs are allowed at the top level\n");
                 free(stmt);
             }
         }
@@ -883,6 +981,16 @@ Program *parse(Token *tokens, int token_count) {
 // Free the memory allocated for a program
 void free_program(Program *program) {
     if (program == NULL) return;
+    
+    // Free structs
+    for (int i = 0; i < program->struct_count; i++) {
+        free(program->structs[i].name);
+        for (int j = 0; j < program->structs[i].field_count; j++) {
+            free(program->structs[i].fields[j].name);
+        }
+        free(program->structs[i].fields);
+    }
+    free(program->structs);
     
     // Free functions
     for (int i = 0; i < program->function_count; i++) {

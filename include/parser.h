@@ -7,6 +7,7 @@
 typedef struct Statement Statement;
 typedef struct Expression Expression;
 typedef struct Function Function;
+typedef struct Struct Struct;  // Added for struct support
 
 // Variable types
 typedef enum
@@ -34,6 +35,14 @@ typedef struct
     int is_array;
     int array_size;
 } Variable;
+
+// Struct structure
+struct Struct
+{
+    char *name;
+    Variable *fields;
+    int field_count;
+};
 
 // Expression types
 typedef enum
@@ -228,6 +237,8 @@ typedef struct
     int function_count;
     Variable *global_vars;
     int global_var_count;
+    Struct *structs;  // Added for struct support
+    int struct_count;
 } Program;
 
 // Global variables for the current program

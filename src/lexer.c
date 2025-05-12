@@ -9,10 +9,10 @@ int is_keyword(const char *str)
 {
     static const char *keywords[] = {
         "int", "float", "char", "void", "if", "else", "while", "for", "do",
-        "return", "break", "continue", "printf", "scanf"};
+        "return", "break", "continue", "printf", "scanf", "struct"};  // Added "struct"
     static const TokenType token_types[] = {
         TOKEN_INT, TOKEN_FLOAT, TOKEN_CHAR, TOKEN_VOID, TOKEN_IF, TOKEN_ELSE, TOKEN_WHILE, TOKEN_FOR, TOKEN_DO,
-        TOKEN_RETURN, TOKEN_BREAK, TOKEN_CONTINUE, TOKEN_PRINTF, TOKEN_SCANF};
+        TOKEN_RETURN, TOKEN_BREAK, TOKEN_CONTINUE, TOKEN_PRINTF, TOKEN_SCANF, TOKEN_STRUCT};  // Added TOKEN_STRUCT
     static const int keyword_count = sizeof(keywords) / sizeof(keywords[0]);
 
     for (int i = 0; i < keyword_count; i++)
@@ -142,14 +142,9 @@ Token *lexer(const char *input, int *token_count)
         {
             char num[256] = {0};
             int i = 0;
-            int is_float = 0;
 
             while (isdigit(input[pos]) || input[pos] == '.')
             {
-                if (input[pos] == '.')
-                {
-                    is_float = 1;
-                }
                 num[i++] = input[pos++];
                 column++;
             }
@@ -422,13 +417,6 @@ Token *lexer(const char *input, int *token_count)
                 pos++;
                 column++;
             }
-            // else
-            // {
-            //     fprintf(stderr, "Error: Unexpected character '&' at line %d, column %d\n", line, column);
-            //     pos++;
-            //     column++;
-            //     continue;
-            // }
             break;
 
         case '|':
@@ -446,13 +434,6 @@ Token *lexer(const char *input, int *token_count)
                 pos++;
                 column++;
             }
-            // else
-            // {
-            //     fprintf(stderr, "Error: Unexpected character '|' at line %d, column %d\n", line, column);
-            //     pos++;
-            //     column++;
-            //     continue;
-            // }
             break;
 
         case ';':

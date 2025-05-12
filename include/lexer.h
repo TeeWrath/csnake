@@ -23,6 +23,9 @@ typedef enum {
     // Functions
     TOKEN_PRINTF, TOKEN_SCANF,
 
+    // Struct
+    TOKEN_STRUCT,  // Added for struct support
+    
     // Bitwise operators
     TOKEN_BIT_AND, TOKEN_BIT_OR, TOKEN_BIT_XOR, 
     TOKEN_BIT_NOT, TOKEN_SHIFT_LEFT, TOKEN_SHIFT_RIGHT,
