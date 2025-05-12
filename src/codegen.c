@@ -53,57 +53,59 @@ const char *get_type_name(VariableType type)
 void generate_variable_declaration(FILE *fp, Variable *var, Expression *initializer, int indent)
 {
     print_indent(fp, indent);
-    fprintf(fp, "%s: %s = ", var->name, get_python_type_name(var->type));
-
-    if (initializer != NULL)
-    {
-        generate_expression(fp, initializer, indent);
-    }
-    else
-    {
-        // Default initialization based on type
-        if (var->is_array)
+    if (var->struct_name) {
+        fprintf(fp, "%s: %s = %s()\n", var->name, var->struct_name, var->struct_name);
+    } else {
+        fprintf(fp, "%s: %s = ", var->name, get_python_type_name(var->type));
+        if (initializer != NULL)
         {
-            fprintf(fp, "[");
-            if (var->type == TYPE_INT)
-            {
-                fprintf(fp, "0");
-            }
-            else if (var->type == TYPE_FLOAT)
-            {
-                fprintf(fp, "0.0");
-            }
-            else if (var->type == TYPE_CHAR)
-            {
-                fprintf(fp, "''");
-            }
-            else
-            {
-                fprintf(fp, "None");
-            }
-            fprintf(fp, "] * %d", var->array_size);
+            generate_expression(fp, initializer, indent);
         }
         else
         {
-            if (var->type == TYPE_INT)
+            if (var->is_array)
             {
-                fprintf(fp, "0");
-            }
-            else if (var->type == TYPE_FLOAT)
-            {
-                fprintf(fp, "0.0");
-            }
-            else if (var->type == TYPE_CHAR)
-            {
-                fprintf(fp, "''");
+                fprintf(fp, "[");
+                if (var->type == TYPE_INT)
+                {
+                    fprintf(fp, "0");
+                }
+                else if (var->type == TYPE_FLOAT)
+                {
+                    fprintf(fp, "0.0");
+                }
+                else if (var->type == TYPE_CHAR)
+                {
+                    fprintf(fp, "''");
+                }
+                else
+                {
+                    fprintf(fp, "None");
+                }
+                fprintf(fp, "] * %d", var->array_size);
             }
             else
             {
-                fprintf(fp, "None");
+                if (var->type == TYPE_INT)
+                {
+                    fprintf(fp, "0");
+                }
+                else if (var->type == TYPE_FLOAT)
+                {
+                    fprintf(fp, "0.0");
+                }
+                else if (var->type == TYPE_CHAR)
+                {
+                    fprintf(fp, "''");
+                }
+                else
+                {
+                    fprintf(fp, "None");
+                }
             }
         }
+        fprintf(fp, "\n");
     }
-    fprintf(fp, "\n");
 }
 
 // Generate a literal expression
@@ -139,6 +141,13 @@ void generate_variable(FILE *fp, Expression *expr)
     fprintf(fp, "%s", expr->var_name);
 }
 
+// Generate a struct member access (e.g., p.x)
+void generate_member_access(FILE *fp, Expression *expr)
+{
+    generate_expression(fp, expr->member_access.struct_expr, 0);
+    fprintf(fp, ".%s", expr->member_access.member_name);
+}
+
 // Generate an array access
 void generate_array_access(FILE *fp, Expression *expr)
 {
@@ -150,7 +159,6 @@ void generate_array_access(FILE *fp, Expression *expr)
 // Generate a binary operation
 void generate_binary_op(FILE *fp, Expression *expr)
 {
-    // Handle special case for assignment
     if (expr->binary.op == OP_ASSIGN)
     {
         generate_expression(fp, expr->binary.left, 0);
@@ -159,11 +167,9 @@ void generate_binary_op(FILE *fp, Expression *expr)
         return;
     }
 
-    // Generate left operand
     fprintf(fp, "(");
     generate_expression(fp, expr->binary.left, 0);
 
-    // Generate operator
     switch (expr->binary.op)
     {
     case OP_ADD:
@@ -225,7 +231,6 @@ void generate_binary_op(FILE *fp, Expression *expr)
         break;
     }
 
-    // Generate right operand
     generate_expression(fp, expr->binary.right, 0);
     fprintf(fp, ")");
 }
@@ -248,7 +253,6 @@ void generate_unary_op(FILE *fp, Expression *expr)
         break;
 
     case OP_PRE_INC:
-        // C's ++x becomes x += 1 in Python
         fprintf(fp, "(");
         generate_expression(fp, expr->unary.expr, 0);
         fprintf(fp, " += 1)");
@@ -260,22 +264,18 @@ void generate_unary_op(FILE *fp, Expression *expr)
         break;
 
     case OP_PRE_DEC:
-        // C's --x becomes x -= 1 in Python
         fprintf(fp, "(");
         generate_expression(fp, expr->unary.expr, 0);
         fprintf(fp, " -= 1)");
         break;
 
     case OP_POST_INC:
-        // This is tricky in Python, as there's no direct equivalent
-        // For simplicity, we'll just do the same as pre-increment
         fprintf(fp, "(");
         generate_expression(fp, expr->unary.expr, 0);
         fprintf(fp, " += 1)");
         break;
 
     case OP_POST_DEC:
-        // For simplicity, we'll just do the same as pre-decrement
         fprintf(fp, "(");
         generate_expression(fp, expr->unary.expr, 0);
         fprintf(fp, " -= 1)");
@@ -307,7 +307,6 @@ void generate_function_call(FILE *fp, Expression *expr)
 // Generate an expression
 void generate_expression(FILE *fp, Expression *expr, int indent)
 {
-    // Suppress unused parameter warning
     (void)indent;
 
     if (expr == NULL)
@@ -339,6 +338,10 @@ void generate_expression(FILE *fp, Expression *expr, int indent)
         generate_array_access(fp, expr);
         break;
 
+    case EXPR_MEMBER_ACCESS:
+        generate_member_access(fp, expr);
+        break;
+
     default:
         fprintf(fp, "# Unknown expression type\n");
         break;
@@ -348,6 +351,7 @@ void generate_expression(FILE *fp, Expression *expr, int indent)
 // Generate a block statement
 void generate_block(FILE *fp, Statement *block, int indent)
 {
+    if (block == NULL) return;
     for (int i = 0; i < block->block.stmt_count; i++)
     {
         generate_statement(fp, block->block.statements[i], indent);
@@ -386,13 +390,11 @@ void generate_while_statement(FILE *fp, Statement *stmt, int indent)
 // Generate a for statement
 void generate_for_statement(FILE *fp, Statement *stmt, int indent)
 {
-    // First, generate the initializer
     if (stmt->for_stmt.initializer != NULL)
     {
         generate_statement(fp, stmt->for_stmt.initializer, indent);
     }
 
-    // Generate the while loop
     print_indent(fp, indent);
     fprintf(fp, "while ");
     if (stmt->for_stmt.condition != NULL)
@@ -401,15 +403,12 @@ void generate_for_statement(FILE *fp, Statement *stmt, int indent)
     }
     else
     {
-        // No condition means an infinite loop in C's for
         fprintf(fp, "True");
     }
     fprintf(fp, ":\n");
 
-    // Generate the loop body
     generate_statement(fp, stmt->for_stmt.body, indent + 1);
 
-    // Generate the increment at the end of the loop body
     if (stmt->for_stmt.increment != NULL)
     {
         print_indent(fp, indent + 1);
@@ -433,9 +432,7 @@ void generate_return_statement(FILE *fp, Statement *stmt, int indent)
 // Generate a break statement
 void generate_break_statement(FILE *fp, Statement *stmt, int indent)
 {
-    // Suppress unused parameter warning
     (void)stmt;
-
     print_indent(fp, indent);
     fprintf(fp, "break\n");
 }
@@ -443,9 +440,7 @@ void generate_break_statement(FILE *fp, Statement *stmt, int indent)
 // Generate a continue statement
 void generate_continue_statement(FILE *fp, Statement *stmt, int indent)
 {
-    // Suppress unused parameter warning
     (void)stmt;
-
     print_indent(fp, indent);
     fprintf(fp, "continue\n");
 }
@@ -455,7 +450,6 @@ void generate_print_statement(FILE *fp, Statement *stmt, int indent)
 {
     print_indent(fp, indent);
 
-    // Simple case: just printing one variable
     if (strcmp(stmt->print.format, "%d") == 0 ||
         strcmp(stmt->print.format, "%f") == 0 ||
         strcmp(stmt->print.format, "%c") == 0 ||
@@ -470,10 +464,8 @@ void generate_print_statement(FILE *fp, Statement *stmt, int indent)
         }
     }
 
-    // More complex case: formatted string
     fprintf(fp, "print(f\"");
 
-    // Convert C format specifiers to Python f-string
     char *format = stmt->print.format;
     int arg_index = 0;
 
@@ -481,7 +473,6 @@ void generate_print_statement(FILE *fp, Statement *stmt, int indent)
     {
         if (format[i] == '%' && format[i + 1] != '\0')
         {
-            // Handle format specifier
             switch (format[++i])
             {
             case 'd':
@@ -521,19 +512,16 @@ void generate_print_statement(FILE *fp, Statement *stmt, int indent)
                 break;
 
             case '%':
-                // Literal '%'
                 fprintf(fp, "%%");
                 break;
 
             default:
-                // Unknown format specifier, just output it as is
                 fprintf(fp, "%%%c", format[i]);
                 break;
             }
         }
         else
         {
-            // Regular character
             fputc(format[i], fp);
         }
     }
@@ -600,6 +588,11 @@ void generate_statement(FILE *fp, Statement *stmt, int indent)
 // Generate Python code from the program
 void generate_python_code(Program *program, const char *output_file)
 {
+    if (program == NULL) {
+        fprintf(stderr, "Error: Cannot generate code, program is NULL\n");
+        return;
+    }
+
     FILE *fp = fopen(output_file, "w");
     if (!fp)
     {
@@ -607,14 +600,11 @@ void generate_python_code(Program *program, const char *output_file)
         return;
     }
 
-    // Add necessary imports
     fprintf(fp, "from dataclasses import dataclass, field\n");
     fprintf(fp, "from typing import List\n\n");
 
-    // Generate structs
     generate_structs(fp, program->structs, program->struct_count);
 
-    // Generate global variables
     fprintf(fp, "# Global variables\n");
     for (int i = 0; i < program->global_var_count; i++)
     {
@@ -622,28 +612,29 @@ void generate_python_code(Program *program, const char *output_file)
     }
     fprintf(fp, "\n");
 
-    // Generate functions
     fprintf(fp, "# Functions\n");
     for (int i = 0; i < program->function_count; i++)
     {
         Function *func = program->functions[i];
+        if (func == NULL) continue;
         fprintf(fp, "def %s(", func->name);
 
-        // Generate parameters with type hints
         for (int j = 0; j < func->param_count; j++)
         {
             if (j > 0)
                 fprintf(fp, ", ");
-            fprintf(fp, "%s: %s", func->params[j].name, get_python_type_name(func->params[j].type));
+            if (func->params[j].struct_name) {
+                fprintf(fp, "%s: %s", func->params[j].name, func->params[j].struct_name);
+            } else {
+                fprintf(fp, "%s: %s", func->params[j].name, get_python_type_name(func->params[j].type));
+            }
         }
         fprintf(fp, ") -> %s:\n", get_python_type_name(func->return_type));
 
-        // Generate function body
         generate_statement(fp, func->body, 1);
         fprintf(fp, "\n");
     }
 
-    // Add main execution
     fprintf(fp, "if __name__ == \"__main__\":\n");
     fprintf(fp, "    main()\n");
 

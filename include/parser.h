@@ -7,7 +7,7 @@
 typedef struct Statement Statement;
 typedef struct Expression Expression;
 typedef struct Function Function;
-typedef struct Struct Struct;  // Added for struct support
+typedef struct Struct Struct;
 
 // Variable types
 typedef enum
@@ -34,6 +34,7 @@ typedef struct
     int is_initialized;
     int is_array;
     int array_size;
+    char *struct_name; // Added to track struct type for variables
 } Variable;
 
 // Struct structure
@@ -52,7 +53,8 @@ typedef enum
     EXPR_BINARY,
     EXPR_UNARY,
     EXPR_CALL,
-    EXPR_ARRAY_ACCESS
+    EXPR_ARRAY_ACCESS,
+    EXPR_MEMBER_ACCESS // Added for struct member access (e.g., p.x)
 } ExpressionType;
 
 // Binary operation types
@@ -142,6 +144,13 @@ struct Expression
             char *array_name;
             Expression *index;
         } array_access;
+
+        // Struct member access (e.g., p.x)
+        struct
+        {
+            Expression *struct_expr; // The struct variable (e.g., p)
+            char *member_name;       // The member (e.g., x)
+        } member_access;
     };
 };
 
@@ -237,7 +246,7 @@ typedef struct
     int function_count;
     Variable *global_vars;
     int global_var_count;
-    Struct *structs;  // Added for struct support
+    Struct *structs;
     int struct_count;
 } Program;
 

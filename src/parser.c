@@ -38,7 +38,7 @@ Function *create_function() {
     return func;
 }
 
-Struct *create_struct() {  // Added for struct support
+Struct *create_struct() {
     Struct *s = malloc(sizeof(Struct));
     if (!s) {
         fprintf(stderr, "Memory allocation failed\n");
@@ -63,10 +63,10 @@ Expression *parse_expression(Parser *parser);
 Statement *parse_statement(Parser *parser);
 Statement *parse_block(Parser *parser);
 Function *parse_function(Parser *parser);
-Struct *parse_struct(Parser *parser);  // Added for struct support
-Expression *parse_bitwise_and(Parser *parser);  // Added forward declaration
-Expression *parse_bitwise_xor(Parser *parser);  // Added forward declaration
-Expression *parse_bitwise_or(Parser *parser);   // Added forward declaration
+Struct *parse_struct(Parser *parser);
+Expression *parse_bitwise_and(Parser *parser);
+Expression *parse_bitwise_xor(Parser *parser);
+Expression *parse_bitwise_or(Parser *parser);
 void advance(Parser *parser);
 Token peek(Parser *parser);
 Token previous(Parser *parser);
@@ -140,10 +140,8 @@ int is_at_end(Parser *parser) {
 
 // Synchronize parser after error
 void synchronize(Parser *parser) {
-    advance(parser);
-    
     while (!is_at_end(parser)) {
-        if (previous(parser).type == TOKEN_SEMICOLON) return;
+        if (previous(parser).type == TOKEN_SEMICOLON || previous(parser).type == TOKEN_RBRACE) return;
         
         switch (peek(parser).type) {
             case TOKEN_INT:
@@ -154,7 +152,11 @@ void synchronize(Parser *parser) {
             case TOKEN_WHILE:
             case TOKEN_FOR:
             case TOKEN_RETURN:
-            case TOKEN_STRUCT:  // Added for struct support
+            case TOKEN_BREAK:
+            case TOKEN_CONTINUE:
+            case TOKEN_STRUCT:
+            case TOKEN_LBRACE:
+            case TOKEN_RBRACE:
                 return;
             default:
                 break;
@@ -164,7 +166,7 @@ void synchronize(Parser *parser) {
     }
 }
 
-// Parse primary expression (literals, variables, parenthesized expressions)
+// Parse primary expression (literals, variables, parenthesized expressions, member access)
 Expression *parse_primary(Parser *parser) {
     Expression *expr = create_expression();
     
@@ -172,7 +174,6 @@ Expression *parse_primary(Parser *parser) {
         expr->type = EXPR_LITERAL;
         expr->literal.lit_type = TYPE_INT;
         
-        // Check if it's a float
         if (strchr(previous(parser).value, '.') != NULL) {
             expr->literal.lit_type = TYPE_FLOAT;
             expr->literal.float_val = atof(previous(parser).value);
@@ -203,13 +204,11 @@ Expression *parse_primary(Parser *parser) {
         if (match(parser, TOKEN_LPAREN)) {
             expr->type = EXPR_CALL;
             expr->call.func_name = name;
-            expr->call.args = malloc(10 * sizeof(Expression*)); // Start with space for 10 args
+            expr->call.args = malloc(10 * sizeof(Expression*));
             expr->call.arg_count = 0;
             
-            // Parse arguments
             if (!check(parser, TOKEN_RPAREN)) {
                 do {
-                    // Resize if needed
                     if (expr->call.arg_count >= 10) {
                         expr->call.args = realloc(expr->call.args, 
                                                  (expr->call.arg_count + 10) * sizeof(Expression*));
@@ -235,19 +234,30 @@ Expression *parse_primary(Parser *parser) {
         // It's a regular variable reference
         expr->type = EXPR_VARIABLE;
         expr->var_name = name;
+        
+        // Check for struct member access (e.g., p.x)
+        while (match(parser, TOKEN_DOT)) {
+            Expression *member_expr = create_expression();
+            member_expr->type = EXPR_MEMBER_ACCESS;
+            member_expr->member_access.struct_expr = expr;
+            consume(parser, TOKEN_ID, "Expected member name after '.'");
+            member_expr->member_access.member_name = strdup(previous(parser).value);
+            expr = member_expr;
+        }
+        
         return expr;
     }
     
     if (match(parser, TOKEN_LPAREN)) {
         Expression *grouping = parse_expression(parser);
         consume(parser, TOKEN_RPAREN, "Expected ')' after expression");
-        free(expr); // Free the unused expr
+        free(expr);
         return grouping;
     }
     
     fprintf(stderr, "Parse error at line %d, column %d: Expected expression\n", 
             peek(parser).line, peek(parser).column);
-    return expr; // Return something to avoid crashes
+    return expr;
 }
 
 // Parse unary expressions
@@ -267,7 +277,7 @@ Expression *parse_unary(Parser *parser) {
             expr->unary.op = OP_PRE_DEC;
         }
         
-        expr->unary.expr = parse_unary(parser); // Parse the operand
+        expr->unary.expr = parse_unary(parser);
         return expr;
     }
     if (match(parser, TOKEN_BIT_NOT)) {
@@ -280,7 +290,6 @@ Expression *parse_unary(Parser *parser) {
     
     Expression *expr = parse_primary(parser);
     
-    // Handle postfix operators
     if (match(parser, TOKEN_INCR)) {
         Expression *postfix = create_expression();
         postfix->type = EXPR_UNARY;
@@ -497,14 +506,13 @@ Expression *parse_assignment(Parser *parser) {
         binary->type = EXPR_BINARY;
         binary->binary.op = OP_ASSIGN;
         
-        // Check if left is a valid lvalue (variable or array access)
-        if (expr->type != EXPR_VARIABLE && expr->type != EXPR_ARRAY_ACCESS) {
+        if (expr->type != EXPR_VARIABLE && expr->type != EXPR_ARRAY_ACCESS && expr->type != EXPR_MEMBER_ACCESS) {
             fprintf(stderr, "Parse error at line %d, column %d: Invalid assignment target\n", 
                     peek(parser).line, peek(parser).column);
         }
         
         binary->binary.left = expr;
-        binary->binary.right = parse_assignment(parser); // Right-associative
+        binary->binary.right = parse_assignment(parser);
         return binary;
     }
     
@@ -517,18 +525,17 @@ Expression *parse_expression(Parser *parser) {
 }
 
 // Parse variable declaration
-Statement *parse_var_declaration(Parser *parser, VariableType type) {
+Statement *parse_var_declaration(Parser *parser, VariableType type, char *struct_name) {
     Statement *stmt = create_statement();
     stmt->type = STMT_VAR_DECL;
     
-    // Get variable name
     consume(parser, TOKEN_ID, "Expected variable name");
     stmt->var_decl.var.name = strdup(previous(parser).value);
     stmt->var_decl.var.type = type;
     stmt->var_decl.var.is_initialized = 0;
     stmt->var_decl.var.is_array = 0;
+    stmt->var_decl.var.struct_name = struct_name ? strdup(struct_name) : NULL;
     
-    // Check for array declaration
     if (match(parser, TOKEN_LBRACKET)) {
         stmt->var_decl.var.is_array = 1;
         
@@ -543,7 +550,6 @@ Statement *parse_var_declaration(Parser *parser, VariableType type) {
         consume(parser, TOKEN_RBRACKET, "Expected ']' after array size");
     }
     
-    // Check for initialization
     if (match(parser, TOKEN_EQUALS)) {
         stmt->var_decl.var.is_initialized = 1;
         stmt->var_decl.initializer = parse_expression(parser);
@@ -571,7 +577,6 @@ Statement *parse_print_statement(Parser *parser) {
     
     consume(parser, TOKEN_LPAREN, "Expected '(' after 'printf'");
     
-    // Parse format string
     if (match(parser, TOKEN_STRING)) {
         stmt->print.format = strdup(previous(parser).value);
     } else {
@@ -580,7 +585,6 @@ Statement *parse_print_statement(Parser *parser) {
         stmt->print.format = strdup("");
     }
     
-    // Parse arguments if any
     stmt->print.args = malloc(10 * sizeof(Expression*));
     stmt->print.arg_count = 0;
     
@@ -615,7 +619,10 @@ Statement *parse_block(Parser *parser) {
             stmt->block.statements = realloc(stmt->block.statements, capacity * sizeof(Statement*));
         }
         
-        stmt->block.statements[stmt->block.stmt_count++] = parse_statement(parser);
+        Statement *next_stmt = parse_statement(parser);
+        if (next_stmt) {
+            stmt->block.statements[stmt->block.stmt_count++] = next_stmt;
+        }
     }
     
     consume(parser, TOKEN_RBRACE, "Expected '}' at end of block");
@@ -663,21 +670,23 @@ Statement *parse_for_statement(Parser *parser) {
     
     consume(parser, TOKEN_LPAREN, "Expected '(' after 'for'");
     
-    // Parse initializer
     if (match(parser, TOKEN_INT) || match(parser, TOKEN_FLOAT) || match(parser, TOKEN_CHAR)) {
         TokenType type_token = previous(parser).type;
-        stmt->for_stmt.initializer = parse_var_declaration(parser, token_to_var_type(type_token));
+        stmt->for_stmt.initializer = parse_var_declaration(parser, token_to_var_type(type_token), NULL);
     } else if (match(parser, TOKEN_SEMICOLON)) {
         stmt->for_stmt.initializer = NULL;
+    } else if (match(parser, TOKEN_STRUCT)) {
+        consume(parser, TOKEN_ID, "Expected struct name");
+        char *struct_name = strdup(previous(parser).value);
+        stmt->for_stmt.initializer = parse_var_declaration(parser, TYPE_VOID, struct_name);
+        free(struct_name);
     } else {
         stmt->for_stmt.initializer = parse_expression_statement(parser);
     }
     
-    // Parse condition
     if (!check(parser, TOKEN_SEMICOLON)) {
         stmt->for_stmt.condition = parse_expression(parser);
     } else {
-        // No condition provided, default to true
         stmt->for_stmt.condition = create_expression();
         stmt->for_stmt.condition->type = EXPR_LITERAL;
         stmt->for_stmt.condition->literal.lit_type = TYPE_INT;
@@ -685,7 +694,6 @@ Statement *parse_for_statement(Parser *parser) {
     }
     consume(parser, TOKEN_SEMICOLON, "Expected ';' after for condition");
     
-    // Parse increment
     if (!check(parser, TOKEN_RPAREN)) {
         stmt->for_stmt.increment = parse_expression(parser);
     } else {
@@ -738,11 +746,9 @@ Statement *parse_continue_statement(Parser *parser) {
 Struct *parse_struct(Parser *parser) {
     Struct *s = create_struct();
     
-    // Parse struct name
     consume(parser, TOKEN_ID, "Expected struct name");
     s->name = strdup(previous(parser).value);
     
-    // Parse fields
     consume(parser, TOKEN_LBRACE, "Expected '{' after struct name");
     
     s->fields = malloc(10 * sizeof(Variable));
@@ -755,7 +761,6 @@ Struct *parse_struct(Parser *parser) {
             s->fields = realloc(s->fields, capacity * sizeof(Variable));
         }
         
-        // Parse field type
         if (match(parser, TOKEN_INT) || match(parser, TOKEN_FLOAT) || match(parser, TOKEN_CHAR)) {
             s->fields[s->field_count].type = token_to_var_type(previous(parser).type);
         } else {
@@ -764,13 +769,12 @@ Struct *parse_struct(Parser *parser) {
             s->fields[s->field_count].type = TYPE_INT;
         }
         
-        // Parse field name
         consume(parser, TOKEN_ID, "Expected field name");
         s->fields[s->field_count].name = strdup(previous(parser).value);
         s->fields[s->field_count].is_array = 0;
         s->fields[s->field_count].is_initialized = 0;
+        s->fields[s->field_count].struct_name = NULL;
         
-        // Check for array field
         if (match(parser, TOKEN_LBRACKET)) {
             s->fields[s->field_count].is_array = 1;
             if (match(parser, TOKEN_NUMBER)) {
@@ -820,7 +824,7 @@ Statement *parse_statement(Parser *parser) {
     }
     
     if (match(parser, TOKEN_LBRACE)) {
-        parser->current--; // Go back to the '{'
+        parser->current--;
         return parse_block(parser);
     }
     
@@ -832,20 +836,26 @@ Statement *parse_statement(Parser *parser) {
         match(parser, TOKEN_CHAR) || match(parser, TOKEN_VOID)) {
         TokenType type_token = previous(parser).type;
         
-        // Check if it's a function declaration
         if (check(parser, TOKEN_ID)) {
             advance(parser);
             
             if (check(parser, TOKEN_LPAREN)) {
-                parser->current -= 2; // Go back to the type token
-                return NULL; // Signal to parse_function
+                parser->current -= 2;
+                return NULL;
             }
             
-            // It's a variable declaration, go back
             parser->current--;
         }
         
-        return parse_var_declaration(parser, token_to_var_type(type_token));
+        return parse_var_declaration(parser, token_to_var_type(type_token), NULL);
+    }
+    
+    if (match(parser, TOKEN_STRUCT)) {
+        consume(parser, TOKEN_ID, "Expected struct name");
+        char *struct_name = strdup(previous(parser).value);
+        Statement *stmt = parse_var_declaration(parser, TYPE_VOID, struct_name);
+        free(struct_name);
+        return stmt;
     }
     
     return parse_expression_statement(parser);
@@ -855,7 +865,6 @@ Statement *parse_statement(Parser *parser) {
 Function *parse_function(Parser *parser) {
     Function *func = create_function();
     
-    // Parse return type
     if (match(parser, TOKEN_INT) || match(parser, TOKEN_FLOAT) || 
         match(parser, TOKEN_CHAR) || match(parser, TOKEN_VOID)) {
         func->return_type = token_to_var_type(previous(parser).type);
@@ -865,11 +874,9 @@ Function *parse_function(Parser *parser) {
         func->return_type = TYPE_VOID;
     }
     
-    // Parse function name
     consume(parser, TOKEN_ID, "Expected function name");
     func->name = strdup(previous(parser).value);
     
-    // Parse parameters
     consume(parser, TOKEN_LPAREN, "Expected '(' after function name");
     
     func->params = malloc(10 * sizeof(Variable));
@@ -883,21 +890,24 @@ Function *parse_function(Parser *parser) {
                 func->params = realloc(func->params, capacity * sizeof(Variable));
             }
             
-            // Parse parameter type
             if (match(parser, TOKEN_INT) || match(parser, TOKEN_FLOAT) || 
                 match(parser, TOKEN_CHAR) || match(parser, TOKEN_VOID)) {
                 func->params[func->param_count].type = token_to_var_type(previous(parser).type);
+                func->params[func->param_count].struct_name = NULL;
+            } else if (match(parser, TOKEN_STRUCT)) {
+                consume(parser, TOKEN_ID, "Expected struct name");
+                func->params[func->param_count].type = TYPE_VOID;
+                func->params[func->param_count].struct_name = strdup(previous(parser).value);
             } else {
                 fprintf(stderr, "Parse error at line %d, column %d: Expected parameter type\n", 
                         peek(parser).line, peek(parser).column);
                 func->params[func->param_count].type = TYPE_INT;
+                func->params[func->param_count].struct_name = NULL;
             }
             
-            // Parse parameter name
             consume(parser, TOKEN_ID, "Expected parameter name");
             func->params[func->param_count].name = strdup(previous(parser).value);
             
-            // Check for array parameter
             func->params[func->param_count].is_array = 0;
             if (match(parser, TOKEN_LBRACKET)) {
                 func->params[func->param_count].is_array = 1;
@@ -910,7 +920,6 @@ Function *parse_function(Parser *parser) {
     
     consume(parser, TOKEN_RPAREN, "Expected ')' after parameters");
     
-    // Parse function body
     func->body = parse_block(parser);
     
     return func;
@@ -928,7 +937,7 @@ Program *parse(Token *tokens, int token_count) {
     program->function_count = 0;
     program->global_vars = malloc(10 * sizeof(Variable));
     program->global_var_count = 0;
-    program->structs = malloc(10 * sizeof(Struct));  // Added for struct support
+    program->structs = malloc(10 * sizeof(Struct));
     program->struct_count = 0;
     
     int func_capacity = 10;
@@ -936,7 +945,6 @@ Program *parse(Token *tokens, int token_count) {
     int struct_capacity = 10;
     
     while (!is_at_end(&parser)) {
-        // Try to parse a struct
         if (match(&parser, TOKEN_STRUCT)) {
             Struct *s = parse_struct(&parser);
             if (program->struct_count >= struct_capacity) {
@@ -944,11 +952,10 @@ Program *parse(Token *tokens, int token_count) {
                 program->structs = realloc(program->structs, struct_capacity * sizeof(Struct));
             }
             program->structs[program->struct_count++] = *s;
-            free(s); // Copy struct into program, free temporary
+            free(s);
             continue;
         }
         
-        // Try to parse a function
         Function *func = parse_function(&parser);
         
         if (func != NULL) {
@@ -958,7 +965,6 @@ Program *parse(Token *tokens, int token_count) {
             }
             program->functions[program->function_count++] = func;
         } else {
-            // Not a function, try parsing a global variable
             Statement *stmt = parse_statement(&parser);
             
             if (stmt != NULL && stmt->type == STMT_VAR_DECL) {
@@ -967,7 +973,7 @@ Program *parse(Token *tokens, int token_count) {
                     program->global_vars = realloc(program->global_vars, var_capacity * sizeof(Variable));
                 }
                 program->global_vars[program->global_var_count++] = stmt->var_decl.var;
-                free(stmt); // We've extracted the variable, free the statement
+                free(stmt);
             } else if (stmt != NULL) {
                 fprintf(stderr, "Error: Only function declarations, global variables, and structs are allowed at the top level\n");
                 free(stmt);
@@ -982,21 +988,25 @@ Program *parse(Token *tokens, int token_count) {
 void free_program(Program *program) {
     if (program == NULL) return;
     
-    // Free structs
     for (int i = 0; i < program->struct_count; i++) {
         free(program->structs[i].name);
         for (int j = 0; j < program->structs[i].field_count; j++) {
             free(program->structs[i].fields[j].name);
+            if (program->structs[i].fields[j].struct_name) {
+                free(program->structs[i].fields[j].struct_name);
+            }
         }
         free(program->structs[i].fields);
     }
     free(program->structs);
     
-    // Free functions
     for (int i = 0; i < program->function_count; i++) {
         free(program->functions[i]->name);
         for (int j = 0; j < program->functions[i]->param_count; j++) {
             free(program->functions[i]->params[j].name);
+            if (program->functions[i]->params[j].struct_name) {
+                free(program->functions[i]->params[j].struct_name);
+            }
         }
         free(program->functions[i]->params);
         // TODO: Free function body (recursively free statements and expressions)
@@ -1004,9 +1014,11 @@ void free_program(Program *program) {
     }
     free(program->functions);
     
-    // Free global variables
     for (int i = 0; i < program->global_var_count; i++) {
         free(program->global_vars[i].name);
+        if (program->global_vars[i].struct_name) {
+            free(program->global_vars[i].struct_name);
+        }
     }
     free(program->global_vars);
     
