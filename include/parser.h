@@ -54,7 +54,8 @@ typedef enum
     EXPR_UNARY,
     EXPR_CALL,
     EXPR_ARRAY_ACCESS,
-    EXPR_MEMBER_ACCESS // Added for struct member access (e.g., p.x)
+    EXPR_MEMBER_ACCESS, // Added for struct member access (e.g., p.x)
+    EXPR_ASM           // Added for inline assembly
 } ExpressionType;
 
 // Binary operation types
@@ -92,6 +93,25 @@ typedef enum
     OP_POST_DEC,
     OP_BIT_NOT,
 } UnaryOpType;
+
+// Inline assembly operand
+typedef struct
+{
+    char *constraint; // e.g., "=r" for output, "r" for input
+    char *variable;   // Variable name (e.g., "out" or "in")
+} AsmOperand;
+
+// Inline assembly structure
+typedef struct
+{
+    char *instructions;        // Assembly instructions string
+    AsmOperand *outputs;       // Output operands
+    int output_count;
+    AsmOperand *inputs;        // Input operands
+    int input_count;
+    char **clobbers;           // Clobbered registers
+    int clobber_count;
+} AsmBlock;
 
 // Expression structure
 struct Expression
@@ -151,6 +171,9 @@ struct Expression
             Expression *struct_expr; // The struct variable (e.g., p)
             char *member_name;       // The member (e.g., x)
         } member_access;
+
+        // Inline assembly
+        AsmBlock asm_block;
     };
 };
 

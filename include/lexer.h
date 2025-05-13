@@ -24,11 +24,14 @@ typedef enum {
     TOKEN_PRINTF, TOKEN_SCANF,
 
     // Struct
-    TOKEN_STRUCT,  // Added for struct support
+    TOKEN_STRUCT,
     
     // Bitwise operators
     TOKEN_BIT_AND, TOKEN_BIT_OR, TOKEN_BIT_XOR, 
     TOKEN_BIT_NOT, TOKEN_SHIFT_LEFT, TOKEN_SHIFT_RIGHT,
+
+    // Inline assembly
+    TOKEN_ASM,  // Added for inline assembly support
     
     // End token
     TOKEN_END

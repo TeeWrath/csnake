@@ -9,10 +9,11 @@ int is_keyword(const char *str)
 {
     static const char *keywords[] = {
         "int", "float", "char", "void", "if", "else", "while", "for", "do",
-        "return", "break", "continue", "printf", "scanf", "struct"};  // Added "struct"
+        "return", "break", "continue", "printf", "scanf", "struct", "asm"};  // Added "asm"
     static const TokenType token_types[] = {
-        TOKEN_INT, TOKEN_FLOAT, TOKEN_CHAR, TOKEN_VOID, TOKEN_IF, TOKEN_ELSE, TOKEN_WHILE, TOKEN_FOR, TOKEN_DO,
-        TOKEN_RETURN, TOKEN_BREAK, TOKEN_CONTINUE, TOKEN_PRINTF, TOKEN_SCANF, TOKEN_STRUCT};  // Added TOKEN_STRUCT
+        TOKEN_INT, TOKEN_FLOAT, TOKEN_CHAR, TOKEN_VOID, TOKEN_IF, TOKEN_ELSE, TOKEN_WHILE, 
+        TOKEN_FOR, TOKEN_DO, TOKEN_RETURN, TOKEN_BREAK, TOKEN_CONTINUE, TOKEN_PRINTF, 
+        TOKEN_SCANF, TOKEN_STRUCT, TOKEN_ASM};  // Added TOKEN_ASM
     static const int keyword_count = sizeof(keywords) / sizeof(keywords[0]);
 
     for (int i = 0; i < keyword_count; i++)
@@ -109,6 +110,83 @@ Token *lexer(const char *input, int *token_count)
         // Initialize token line and column
         tokens[*token_count].line = line;
         tokens[*token_count].column = column;
+
+        // Inline assembly (starts with "asm")
+        if (strncmp(&input[pos], "asm", 3) == 0 && !isalnum(input[pos + 3]))
+        {
+            char asm_block[4096] = {0};
+            int asm_pos = 0;
+            pos += 3; // Skip "asm"
+            column += 3;
+
+            // Skip whitespace
+            while (isspace(input[pos]) && input[pos] != '\n')
+            {
+                pos++;
+                column++;
+            }
+
+            // Expect '('
+            if (input[pos] != '(')
+            {
+                fprintf(stderr, "Error: Expected '(' after 'asm' at line %d, column %d\n", line, column);
+                pos++;
+                column++;
+                continue;
+            }
+            pos++; // Skip '('
+            column++;
+
+            // Capture the entire asm block until closing ')'
+            int paren_count = 1;
+            while (input[pos] != '\0' && paren_count > 0)
+            {
+                if (input[pos] == '\n')
+                {
+                    line++;
+                    column = 1;
+                }
+                else
+                {
+                    column++;
+                }
+
+                if (input[pos] == '(')
+                {
+                    paren_count++;
+                }
+                else if (input[pos] == ')')
+                {
+                    paren_count--;
+                }
+
+                if (paren_count > 0)
+                {
+                    if (asm_pos < 4095)
+                    {
+                        asm_block[asm_pos++] = input[pos];
+                    }
+                    else
+                    {
+                        fprintf(stderr, "Error: Assembly block too large at line %d, column %d\n", line, column);
+                        break;
+                    }
+                }
+                pos++;
+            }
+
+            if (paren_count != 0)
+            {
+                fprintf(stderr, "Error: Unclosed parenthesis in asm block at line %d, column %d\n", line, column);
+                continue;
+            }
+
+            asm_block[asm_pos] = '\0';
+            tokens[*token_count].type = TOKEN_ASM;
+            tokens[*token_count].value = strdup(asm_block);
+            (*token_count)++;
+            continue;
+        }
 
         // Identifiers and keywords
         if (isalpha(input[pos]) || input[pos] == '_')
@@ -498,6 +576,7 @@ Token *lexer(const char *input, int *token_count)
             pos++;
             column++;
             break;
+
         case '^':
             tokens[*token_count].type = TOKEN_BIT_XOR;
             tokens[*token_count].value = strdup("^");

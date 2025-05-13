@@ -89,7 +89,7 @@ int main(int argc, char *argv[]) {
         Program *program = parse(tokens, token_count);
         
         // Generate Python code
-        generate_python_code(program, output_file);
+        generate_code(program, output_file);
         
         // Cleanup
         for (int i = 0; i < token_count; i++) {
@@ -117,7 +117,7 @@ int main(int argc, char *argv[]) {
     Program *program = parse(tokens, token_count);
     
     // Generate Python code
-    generate_python_code(program, output_file);
+    generate_code(program, output_file);
     
     // Cleanup
     free(input);
