@@ -1,5 +1,21 @@
 #!/bin/bash
 
+# Run make clean
+echo "Running make clean..."
+make clean
+if [ $? -ne 0 ]; then
+    echo "Error: make clean failed."
+    exit 1
+fi
+
+# Run make
+echo "Running make..."
+make
+if [ $? -ne 0 ]; then
+    echo "Error: make failed."
+    exit 1
+fi
+
 # Ensure csnakecompiler exists and is executable
 if [ ! -f "./csnakecompiler" ]; then
     echo "Error: csnakecompiler not found in current directory."
