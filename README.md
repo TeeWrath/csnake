@@ -1,4 +1,3 @@
-````markdown
 # Csnake: C to Python Transpiler
 
 Csnake is a cross-code translator designed to transpile C language code into Python, facilitating seamless code migration and interoperability between these two popular programming languages.
