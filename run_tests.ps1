@@ -1,18 +1,18 @@
-# Run make clean
-Write-Host "Running make clean..."
-make clean
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Error: make clean failed."
-    exit 1
-}
+# # Run make clean
+# Write-Host "Running make clean..."
+# make clean
+# if ($LASTEXITCODE -ne 0) {
+#     Write-Host "Error: make clean failed."
+#     exit 1
+# }
 
-# Run make
-Write-Host "Running make..."
-make
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Error: make failed."
-    exit 1
-}
+# # Run make
+# Write-Host "Running make..."
+# make
+# if ($LASTEXITCODE -ne 0) {
+#     Write-Host "Error: make failed."
+#     exit 1
+# }
 
 # Ensure csnakecompiler exists
 if (-not (Test-Path "./csnakecompiler")) {

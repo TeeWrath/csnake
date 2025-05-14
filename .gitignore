@@ -1,8 +1,1 @@
-output.py
-array.py
-fact.py
-loop.py
-*.out
-src/*.o
 test_result/
-# csnakecompiler
