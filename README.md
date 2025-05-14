@@ -1,3 +1,4 @@
+````markdown
 # Csnake: C to Python Transpiler
 
 Csnake is a cross-code translator designed to transpile C language code into Python, facilitating seamless code migration and interoperability between these two popular programming languages.
@@ -70,28 +71,55 @@ make test
 
 This will compile the transpiler, create a sample factorial calculation program in C, compile it to Python, and run the resulting Python code.
 
+## Run Instructions
+
+To run all automated tests:
+
+* **On Windows**:
+
+  1. Open **PowerShell** in the project root directory.
+  2. Run the following command:
+
+     ```powershell
+     .\run_tests.ps1
+     ```
+
+* **On Linux**:
+
+  1. Open **Terminal** in the project root directory.
+  2. Run the following command:
+
+     ```bash
+     ./run_tests.sh
+     ```
+
 ## Project Structure
 
-- `include/`: Contains header files used in the project.
-  - `lexer.h`: Defines token types and lexer function prototypes.
-  - `parser.h`: Defines the AST structures and parser function prototypes.
-  - `codegen.h`: Defines code generation function prototypes.
-  
-- `src/`: Holds the source code for Csnake's implementation.
-  - `lexer.c`: Tokenizes C code into language tokens.
-  - `parser.c`: Parses tokens into an Abstract Syntax Tree (AST).
-  - `codegen.c`: Generates Python code from the AST.
-  - `main.c`: Main program that ties everything together.
+* `include/`: Contains header files used in the project.
 
-- `test_factorial.c`: Sample C program for testing factorial calculation.
-- `test_loop.c`: Sample C program for testing loops and conditionals.
-- `Makefile`: Defines the build instructions for the project.
+  * `lexer.h`: Defines token types and lexer function prototypes.
+  * `parser.h`: Defines the AST structures and parser function prototypes.
+  * `codegen.h`: Defines code generation function prototypes.
+
+* `src/`: Holds the source code for Csnake's implementation.
+
+  * `lexer.c`: Tokenizes C code into language tokens.
+  * `parser.c`: Parses tokens into an Abstract Syntax Tree (AST).
+  * `codegen.c`: Generates Python code from the AST.
+  * `main.c`: Main program that ties everything together.
+
+* `test_factorial.c`: Sample C program for testing factorial calculation.
+
+* `test_loop.c`: Sample C program for testing loops and conditionals.
+
+* `Makefile`: Defines the build instructions for the project.
 
 ## Examples
 
 ### Example 1: Factorial Calculation
 
 **Input (C code):**
+
 ```c
 // Calculate factorial in C
 int factorial(int n) {
@@ -109,6 +137,7 @@ int main() {
 ```
 
 **Output (Python code):**
+
 ```python
 # Generated Python code from C source
 # This file was automatically translated by Csnake
@@ -130,6 +159,7 @@ if __name__ == "__main__":
 ### Example 2: Loops and Conditionals
 
 **Input (C code):**
+
 ```c
 // Calculate the sum of first n natural numbers
 int sum_iterative(int n) {
@@ -149,6 +179,7 @@ int main() {
 ```
 
 **Output (Python code):**
+
 ```python
 # Generated Python code from C source
 # This file was automatically translated by Csnake
@@ -173,9 +204,9 @@ if __name__ == "__main__":
 
 ## Limitations
 
-- Complex C features like structs, pointers, and memory management are not fully supported.
-- Some C-specific operators and features may not have perfect Python equivalents.
-- The transpiler handles basic printf formats but complex formats may not translate perfectly.
+* Complex C features like structs, pointers, and memory management are not fully supported.
+* Some C-specific operators and features may not have perfect Python equivalents.
+* The transpiler handles basic printf formats but complex formats may not translate perfectly.
 
 ## Contributing
 
@@ -189,3 +220,5 @@ Contributions are welcome! If you'd like to improve Csnake or report issues, ple
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+```
