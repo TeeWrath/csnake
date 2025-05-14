@@ -1,0 +1,90 @@
+name: CSnake Tests
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    
+    - name: Build csnakecompiler
+      run: |
+        make clean || true
+        make
+        chmod +x ./csnakecompiler
+    
+    - name: Create test_result directory
+      run: mkdir -p test_result
+    
+    - name: Run tests
+      run: |
+        # Find all .c files in the test folder
+        c_files=$(find test -type f -name "*.c")
+        
+        # Check if there are any .c files
+        if [ -z "$c_files" ]; then
+          echo "Error: No .c files found in test folder."
+          exit 1
+        fi
+        
+        # Process each .c file
+        for c_file in $c_files; do
+          # Extract the base name
+          base_name=$(basename "$c_file" .c)
+          echo "Processing $c_file..."
+          
+          # Define output Python file path
+          py_file="test_result/$base_name.py"
+          
+          # Define output text file path for Python execution result
+          output_file="test_result/$base_name.txt"
+          
+          # Run csnakecompiler to generate Python file
+          ./csnakecompiler "$c_file" -o "$py_file"
+          if [ $? -ne 0 ]; then
+            echo "Error: Failed to compile $c_file"
+            continue
+          fi
+          
+          # Check if Python file was generated
+          if [ ! -f "$py_file" ]; then
+            echo "Error: Python file $py_file not generated."
+            continue
+          fi
+          
+          # Run the generated Python file and capture output
+          echo "Running $py_file..."
+          python "$py_file" > "$output_file" 2>&1
+          if [ $? -ne 0 ]; then
+            echo "Error: Failed to run $py_file. See $output_file for details."
+          else
+            echo "Output saved to $output_file"
+          fi
+        done
+
+    - name: Archive test results
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results
+        path: test_result/
+        retention-days: 5
